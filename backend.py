@@ -23,12 +23,12 @@ nest_asyncio.apply()
 load_dotenv()
 
 # api keys 
-langchain_tracing_v2 = os.getenv('LANGCHAIN_TRACING_V2')
-langchain_endpoint = os.getenv('LANGCHAIN_ENDPOINT')
-langchain_api_key = os.getenv('LANGCHAIN_API_KEY')
-open_router_api_key = os.getenv('OPENROUTER_API_KEY')
-google_api_key = os.getenv('GOOGLE_SEARCH_API')
-cse_id = os.getenv('CSE_ID')
+langchain_tracing_v2 = st.secrets['LANGCHAIN_TRACING_V2']
+langchain_endpoint = st.secrets['LANGCHAIN_ENDPOINT']
+langchain_api_key = st.secrets['LANGCHAIN_API_KEY']
+open_router_api_key = st.secrets['OPENROUTER_API_KEY']
+google_api_key = st.secrets['GOOGLE_SEARCH_API']
+cse_id = st.secrets['CSE_ID']
 os.environ['USER_AGENT'] = 'MyLangchainApp/1.0'
 
 llm = ChatOpenAI(
