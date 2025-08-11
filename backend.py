@@ -26,13 +26,13 @@ load_dotenv()
 langchain_tracing_v2 = os.getenv('LANGCHAIN_TRACING_V2')
 langchain_endpoint = os.getenv('LANGCHAIN_ENDPOINT')
 langchain_api_key = os.getenv('LANGCHAIN_API_KEY')
-openai_api_key = os.getenv('OPENAI_API_KEY')    
+open_router_api_key = os.getenv('OPENROUTER_API_KEY')
 google_api_key = os.getenv('GOOGLE_SEARCH_API')
 cse_id = os.getenv('CSE_ID')
 os.environ['USER_AGENT'] = st.secrets['USER_AGENT']
 
 llm = ChatOpenAI(
-    openai_api_key=openai_api_key,
+    openai_api_key=open_router_api_key,
     openai_api_base="https://openrouter.ai/api/v1",
     model="deepseek/deepseek-chat-v3-0324",
     temperature=0
