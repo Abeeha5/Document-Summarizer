@@ -29,7 +29,7 @@ langchain_api_key = os.getenv('LANGCHAIN_API_KEY')
 open_router_api_key = os.getenv('OPENROUTER_API_KEY')
 google_api_key = os.getenv('GOOGLE_SEARCH_API')
 cse_id = os.getenv('CSE_ID')
-os.environ['USER_AGENT'] = st.secrets['USER_AGENT']
+os.environ['USER_AGENT'] = 'MyLangchainApp/1.0'
 
 llm = ChatOpenAI(
     openai_api_key=open_router_api_key,
