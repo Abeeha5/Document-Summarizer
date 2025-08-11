@@ -1,22 +1,22 @@
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders.base import BaseLoader
-from langchain.agents import initialize_agent, Tool
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
-from langchain_community.vectorstores import FAISS
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import Document
-from crawl4ai import AsyncWebCrawler
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from googleapiclient.discovery import build
+from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
+import requests_cache
+import nest_asyncio
+import trafilatura
 import asyncio
+import httpx
 import os
-import sys
 
 # to avoid problems with asyncio
-if sys.platform.startswith("win"):
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+nest_asyncio.apply()
 
 # load data from .env file
 load_dotenv()
@@ -25,55 +25,60 @@ load_dotenv()
 langchain_tracing_v2 = os.getenv('LANGCHAIN_TRACING_V2')
 langchain_endpoint = os.getenv('LANGCHAIN_ENDPOINT')
 langchain_api_key = os.getenv('LANGCHAIN_API_KEY')
-open_router_api_key = os.getenv('OPEN_ROUTER_API_KEY')
+open_router_api_key = os.getenv('OPENAI_API_KEY')
+google_api_key = os.getenv('GOOGLE_SEARCH_API')
+cse_id = os.getenv('CSE_ID')
+os.environ['USER_AGENT'] = 'MyLangchainApp/1.0'
 
 llm = ChatOpenAI(
     openai_api_key=open_router_api_key,
     openai_api_base="https://openrouter.ai/api/v1",
-    model="openrouter/horizon-beta",
+    model="deepseek/deepseek-chat-v3-0324",
     temperature=0
 )
 
-# set up a langchain tool using crawl4ai
-class Crawl4AILoader(BaseLoader):
+# google search
+def google_search(query, api_key = google_api_key, cse_id = cse_id, num_results = 2):
+    service = build("customsearch", "v1", developerKey=api_key)
+    results = service.cse().list(q=query, cx=cse_id, num=num_results).execute()
+    urls = [item['link'] for item in results.get('items', [])]
+    return urls
 
-    def __init__(self, urls: str, browser_config=None, run_config=None):
-        self.urls = urls
-        self.browser_config = browser_config
-        self.run_config = run_config
-    
-    async def load(self) -> list[Document]:
-        async with AsyncWebCrawler(config=self.browser_config) as crawler:
-            await crawler.start()
-            res = await crawler.arun(self.urls, config=self.run_config)
-        doc = Document(page_content = res.markdown, metadata = {'url': res.url})
-        return [doc]
+# Enable persistent caching for HTTPX
+requests_cache.install_cache("web_cache", expire_after=3600)  
+# expire_after in seconds → 3600 sec = 1 hour 
 
-# wrap it as a tool in the langchain agent
-tool = Tool(
-    name = 'crawl_web',
-    func = lambda url: asyncio.run(Crawl4AILoader(url).load()),
-    description = 'Crawl a url and return text content'
-)
+# fetches the url
+async def fetch(session, url):
+    try:
+        resp = await session.get(url, timeout=10)
+        if resp.status_code == 200:
+            return url, resp.text
+    except Exception as e:
+        print(f"Error fetching {url}: {e}")
+    return url, None
 
-agent = initialize_agent([tool], llm = llm, agent_type="zero-shot-react-description", verbose=True)
-
-# web crawl to fetch docs using firecrawl api
-def crawl_links(urls):
-    pages = []
-    for url in urls:
-        docs = asyncio.run(Crawl4AILoader(url).load())
-        pages.extend(docs)
-    return pages    
+# fetch content from multiple sites in parallel
+async def scrap_sites(urls):
+    docs = []
+    async with httpx.AsyncClient(headers={"User-Agent": "MyFastCrawler/1.0"}) as client:
+        results = await asyncio.gather(*(fetch(client, url) for url in urls))
+        for url, html in results:
+            if html:
+                text = trafilatura.extract(html)
+                if text:
+                    docs.append(Document(page_content=text, metadata={"source": url}))
+    return docs
 
 # split the retreived docs and store in vector db
 def create_vector_db(pages):
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size = 500, chunk_overlap = 100)
+    # print(len(pages)) 
+    splitter = RecursiveCharacterTextSplitter(chunk_size = 800, chunk_overlap = 100)
 
     chunks = splitter.split_documents(pages)
 
-    embeddings = HuggingFaceEmbeddings(model_name='sentence-transformers/all-mpnet-base-v2')
+    embeddings = HuggingFaceEmbeddings(model_name='all-MiniLM-L6-v2')
 
     vector_store = FAISS.from_documents(chunks, embeddings)
 
@@ -84,18 +89,10 @@ def qa_retreival_chain(question, vector_store):
 
     # make a vectorstore retreiver
     retriever = vector_store.as_retriever()
-
-    # specify the llm to be used 
-    llm = ChatOpenAI(
-            model='openrouter/horizon-beta',
-            temperature=0 )
-    
-    # retreive the relevant docs
-    # context = retreiver.get_relevant_documents(question)
     
     # define the prompt template
     template = (
-        'Ok so you are given the following question {question}. And this is the text you are supposed to summarize the context {context} given the question. If you do not know the answer tell that you do not know.'
+        'Ok so you are given the following question {question}. And this is the text you are supposed to summarize the context {context} given the question. If you do not know the answer tell that you do not know. Do not mention that you are answering from a document. Do not use I or me , tell it as if you are informing.'
     )
 
     # prompt
