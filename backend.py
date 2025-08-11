@@ -12,6 +12,7 @@ import requests_cache
 import nest_asyncio
 import trafilatura
 import asyncio
+import streamlit as st
 import httpx
 import os
 
@@ -28,7 +29,7 @@ langchain_api_key = os.getenv('LANGCHAIN_API_KEY')
 open_router_api_key = os.getenv('OPENAI_API_KEY')
 google_api_key = os.getenv('GOOGLE_SEARCH_API')
 cse_id = os.getenv('CSE_ID')
-os.environ['USER_AGENT'] = 'MyLangchainApp/1.0'
+os.environ['USER_AGENT'] = st.secrets['USER_AGENT']
 
 llm = ChatOpenAI(
     openai_api_key=open_router_api_key,
