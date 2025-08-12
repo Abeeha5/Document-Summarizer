@@ -93,7 +93,7 @@ def qa_retreival_chain(question, vector_store):
     
     # define the prompt template
     template = (
-        'Ok so you are given the following question {question}. And this is the text you are supposed to summarize the context {context} given the question. If you do not know the answer tell that you do not know. Do not mention that you are answering from a document. Do not use I or me , tell it as if you are informing.'
+        'Ok so you are given the following question {question}. And this is the text you are supposed to summarize the context {context} given the question. If you do not know the answer tell that you do not know. Do not mention that you are answering from a document. Do not use I or me , tell it as if you are informing.  If asked something like who are you or another related question that is personal, tell them that you are an ai model.'
     )
 
     # prompt
